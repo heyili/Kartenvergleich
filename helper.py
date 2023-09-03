@@ -67,21 +67,38 @@ def get_points_from_linestring(ref_route):
         ref_arr.append([x,ref_y[idx]])
     return ref_arr
 
+# def condense_route(route, factor):
+#      condensed_route = LineString()
+#      init_point = get_points_from_linestring(route)
+#      result = []
+#      if len(init_point) > 1:
+#          for point in init_point:
+#              temp = condensed_route(LineString(point),factor)
+#              result.append(temp)
+#      else:
+#          result = condense(route, factor)
+#      return result
 def condense_route(route, factor):
     condensed_route = LineString()
     init_point = []
     init_point = get_points_from_linestring(route)
-    start, end = Point(init_point[0]), Point(init_point[1])
-    distance = start.distance(end)
-    step = distance/factor
-    angel = get_bearing_in_grad_utm(init_point[0][0], init_point[0][1],init_point[1][0], init_point[1][1])
     result = []
-    result.append(init_point[0])
-    start_x, start_y = init_point[0][0], init_point[0][1]
-    for i in range(round(step)-1):
-        x,y = get_point_from_bearing_and_distance_utm2(start_x,start_y, angel, factor)
-        start_x, start_y = x,y
-        result.append([x,y])
-    result.append(init_point[1])
+
+    for idx in range(0, len(init_point)-1):
+        #add initial point
+        if idx == 0:
+            result.append(init_point[0])
+        start, end = Point(init_point[idx]), Point(init_point[idx+1])
+        distance = start.distance(end)
+        #only condense if the distance is bigger than desired
+        if distance > factor:
+            step = distance/factor
+            angel = get_bearing_in_grad_utm(init_point[idx][0], init_point[idx][1],init_point[idx+1][0], init_point[idx+1][1])
+            start_x, start_y = init_point[idx][0], init_point[idx][1]
+            for i in range(round(step)-1):
+                x,y = get_point_from_bearing_and_distance_utm2(start_x,start_y, angel, factor)
+                start_x, start_y = x,y
+                result.append([x,y])
+        result.append(init_point[idx+1])
     return result
 

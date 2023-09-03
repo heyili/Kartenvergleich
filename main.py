@@ -1,19 +1,11 @@
-import sqlite3
 import timeit
-
-import fiona
 import geopandas as gpd
-import helper as h
-import shapely
 from shapely.geometry import LineString, Point, MultiPoint
-import numpy as np
 import find_nearst as fn
+import helper
+import helper as h
 
 
-#paul fragen wegen  ball tree
-# verdichten 5 m
-# runtime tracking
-# intersection länge vergleich
 def load():
     # Read the shapefile
     DLM = gpd.read_file('Data/DLM_Strasse_Fahrbahnachse.shp')
@@ -25,15 +17,13 @@ def load():
     DLM_street, Here_street = [], []
 
     for LineS in geo_DLM:
-        res = get_points_from_linestring(LineS)
-        DLM_street.append(res)
+        route = helper.condense_route(LineS, 5)
+        #res = get_points_from_linestring(route)
+        DLM_street.append(route)
 
     for LineS in geo_Here:
         Here_street.append(LineS)
-
-
     hereS_ID = []
-
     for street in DLM_street:
         #iterate through all points in one DLM street
         temp_id = []
@@ -54,11 +44,12 @@ def load():
                             here_idx = Here_street.index(here_street)
              temp_id.append(here_idx)
         hereS_ID.append(temp_id)
-
+    print(hereS_ID)
     return hereS_ID
     ####example####
     # street1 = (1,2), (2,3), (3,4)
     # street2 = (2,2), (3,3)
+
 def card_comparsion(lon_1, lat_1,lon_2, lat_2, here_streets):
     start, end = h.cal_orthogonal(lon_1, lat_1,lon_2, lat_2)
     orthogonal = LineString(start, end)
@@ -82,113 +73,81 @@ def get_points_from_linestring(ref_route):
         ref_arr.append([x,ref_y[idx]])
     return ref_arr
 
-if __name__ == '__main__':
+
+def match_here_to_DLM(DLM, Here, Here_id):
+
+     hereS_ID = []
+     DLM = list(DLM.coords)
+     #iterate through all points in one DLM street
+     temp_id = []
+     for idx in range(0, len(DLM)-1):
+          start, end = h.cal_orthogonal(DLM[idx][0],DLM[idx][1],DLM[idx+1][0],DLM[idx+1][1])
+          ref_line = LineString([start,end])
+          #default if no here street is matched
+          here_idx = -1
+          min_value = float('inf')
+          # for one point of a DLM street find the distance between it and all herestreets +
+          for here_street in Here:
+              intersection_point = ref_line.intersection(here_street)
+              if intersection_point.is_empty == False:
+                  distance = float('inf')
+                  if type(intersection_point) == Point:
+                    distance = h.get_distance_in_m_utm(start[0],start[1], intersection_point.x,intersection_point.y)
+                  if type(intersection_point) == MultiPoint:
+                    distance = h.get_distance_in_m_utm(start[0],start[1], intersection_point.geoms[0].x,intersection_point.geoms[0].y)
+                  if distance < min_value:
+                         min_value = distance
+                         here_idx = Here.index(here_street)
+          if here_idx != -1:
+              temp_id.append(Here_id[here_idx])
+          else:
+              temp_id.append(here_idx)
+     return temp_id
+
+def Karten_vergleich():
+    #load streets
     gdb_path = "Data/DLM_STRASSEN.gdb"
     street_path = "Data/2301_strassen_here.gpkg"
-    layers = fiona.listlayers(street_path)
-
-    print(layers)
-
     start = timeit.default_timer()
-
-    # chunk_size = 50000  # Define a reasonable chunk size based on your memory availability
-    # offset = 0
-    # conn = sqlite3.connect('mydata.db')
-    # while True:
-    #     try:
-    #         # Read a chunk of data
-    #         chunk = gpd.read_file(gdb_path, layer='DLM_STRASSEN', rows=chunk_size, skiprows=offset)
-    #
-    #         # If the chunk is empty, we've reached the end of the file
-    #         if not len(chunk):
-    #             break
-    #
-    #         # Write the chunk to the database
-    #         chunk.to_sql('my_table', conn, if_exists='append', index=False)
-    #
-    #         # Update the offset
-    #         offset += chunk_size
-    #
-    #     except MemoryError:
-    #         print("Memory error occurred!")
-    #         break
-    #
-
-    columns_to_load = ['geometry']
-    with fiona.open(gdb_path, layer='DLM_STRASSEN') as src:
-     num_rows = len(src)
-    print(num_rows)
-
-
-    with fiona.open(street_path, layer ="2301_strassen_here") as src:
-     num_rows = len(src)
-    print(num_rows)
-
-    #DLM has Multilinestring
-    start = timeit.default_timer()
-    DLM = gpd.read_file(gdb_path,  layer='DLM_STRASSEN', rows= 2)
+    #rows can be modified
+    DLM = gpd.read_file(gdb_path,  layer='DLM_STRASSEN', rows= 20000)
     stop = timeit.default_timer()
     print('Time for DLM street: ', stop - start)
 
     start = timeit.default_timer()
-    Herestreet = gpd.read_file(street_path, layer ="2301_strassen_here", rows = 200)
+    Herestreet = gpd.read_file(street_path, layer ="2301_strassen_here", rows = 400000)
     stop = timeit.default_timer()
     print('Time for Herestreet: ', stop - start)
-    layers = fiona.listlayers(gdb_path)
-
-    # DLM.to_file("DLM.shp")
-    # Herestreet.to_file("HERE.shp")
-    #
-    # start = timeit.default_timer()
-    # DLM_shp = gpd.read_file("DLM.shp")
-    # stop = timeit.default_timer()
-    # print('Time for dlm shp: ', stop - start)
-    #
-    # start = timeit.default_timer()
-    # Here_shp = gpd.read_file("HERE.shp")
-    # stop = timeit.default_timer()
-    # print('Time for Here shp: ', stop - start)
 
 
     DLM_street = DLM.geometry
-    #DLM_street_Linestring = [lambda x: DLM_street list[x]]
     DLM_street_Linestring = []
     Here_street = list(Herestreet.geometry)
-    for street in DLM_street:
 
+    for street in DLM_street:
+        #condense DLM street with every 5 meters
+        #res = helper.condense_route(list(street.geoms)[0], 10)
+        # DLM_street_Linestring.append(LineString(res))
+
+        # with out condense
         DLM_street_Linestring.append(list(street.geoms)[0])
 
-    fn.find_nearst(DLM_street_Linestring, Here_street,1)
+    # n -> number of nearst neigbours
+    nearst_here_streets = fn.find_nearst(DLM_street_Linestring, Here_street,20)
+    nearst_linestring = []
+    #  get the corresponding linstring
+    for near in nearst_here_streets:
+        temp = []
+        for idx in near:
+           temp.append(Here_street[idx])
+        nearst_linestring.append(temp)
 
-    # Print layers (you can choose the one you need from here)
-   #  for layer in layers:
-   #      print(layer)
-   #
-   #  with fiona.open(street_path, layer='strassen_neu') as src:
-   #   #Get the schema of the data, which contains the column names (properties)
-   #     schema = src.schema
-   #     columns = list(schema['properties'].keys())
-   #  print(columns)
-   # #street = gpd.read_file("Data/DLM_STRASSEN.gdb", layer = "strassen_neu")
-   #  with fiona.open(gdb_path, layer='DLM_STRASSEN') as src:
-   #  # Get the schema of the data, which contains the column names (properties)
-   #      schema = src.schema
-   #      columns = list(schema['properties'].keys())
-   #
-   #  print(columns)
-#     gdf = gpd.read_file(gdb_path, layer='DLM_STRASSEN')
-#     print("sdsd")
-#     # Filter to only linestring geometries (if needed)
-#     linestrings_gdf = gdf[gdf.geometry.geom_type == "LineString"]
-#     linestrings_gdf.to_file("linestrings.shp")
-#     #database = gpd.read_file("Data/strassen_neu_10753080473457119842.gpkg", layer = "strassen_neu", driver = "GPKG")
-#     print("sdsd")
-#     streets = [
-#         [0,0,1,1,2,2,3,4],
-#         [1, 1, 2, 2, 3, 3],
-#         [2, 2, 3, 3, 4, 4],
-#         [10, 10, 11, 11, 12, 12]
-#     ]
-#    # print(load())
-#
-# # See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    mapping_result = []
+    for idx, DLM in enumerate(DLM_street_Linestring):
+        mapping_result.append(match_here_to_DLM(DLM, nearst_linestring[idx], nearst_here_streets[idx]))
+    print(mapping_result)
+
+
+if __name__ == '__main__':
+    #load()
+    Karten_vergleich()

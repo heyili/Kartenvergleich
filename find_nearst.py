@@ -20,6 +20,7 @@ def custom_metric_2(array1, array2):
             total_distance += np.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
     # for p1, p2 in zip(array1.reshape(int(array1.shape[0]/2) , 2), array2.reshape(int(array2.shape[0]/2), 2)):
     #     total_distance += np.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
+
     return total_distance / length2
 
 def find_nearst(DLM, Here, n):
@@ -32,13 +33,13 @@ def find_nearst(DLM, Here, n):
     DLM_neigbour = []
     for i, line in enumerate(DLM):
        #first try with one street TODO
-       result = list(idx.nearest((DLM[0].bounds), n))
+       result = list(idx.nearest((DLM[i].bounds), n))
        if result:
            DLM_neigbour.append(result)
        else:
            raise ValueError("The required number of nearst neigbour is too large")
     #print(DLM_neigbour)
-    return result
+    return DLM_neigbour
 if __name__ == '__main__':
     # line = LineString([(0, 0), (1, 1), (2, 2), (3, 3)])
     # line_2 = LineString([(0, 0), (1, 1), (2, 2), (3, 3)])
