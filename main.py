@@ -1,5 +1,6 @@
 import timeit
 import geopandas as gpd
+import numpy as np
 from shapely.geometry import LineString, Point, MultiPoint
 import find_nearst as fn
 import helper
@@ -110,12 +111,14 @@ def Karten_vergleich():
     street_path = "Data/2301_strassen_here.gpkg"
     start = timeit.default_timer()
     #rows can be modified
-    DLM = gpd.read_file(gdb_path,  layer='DLM_STRASSEN', rows= 20000)
+    num_DLM = 2000
+    DLM = gpd.read_file(gdb_path,  layer='DLM_STRASSEN', rows= num_DLM)
     stop = timeit.default_timer()
     print('Time for DLM street: ', stop - start)
 
     start = timeit.default_timer()
-    Herestreet = gpd.read_file(street_path, layer ="2301_strassen_here", rows = 400000)
+    num_Here = 400000
+    Herestreet = gpd.read_file(street_path, layer ="2301_strassen_here", rows = num_Here)
     stop = timeit.default_timer()
     print('Time for Herestreet: ', stop - start)
 
@@ -143,10 +146,25 @@ def Karten_vergleich():
         nearst_linestring.append(temp)
 
     mapping_result = []
-    for idx, DLM in enumerate(DLM_street_Linestring):
-        mapping_result.append(match_here_to_DLM(DLM, nearst_linestring[idx], nearst_here_streets[idx]))
-    print(mapping_result)
+    for idx, item in enumerate(DLM_street_Linestring):
+        mapping_result.append(match_here_to_DLM(item, nearst_linestring[idx], nearst_here_streets[idx]))
+    #print(mapping_result)
 
+    n = num_Here
+    # Create an object array of empty arrays
+    Here_WDM = [np.empty(0).tolist() for _ in range(n)]
+    Herestreet["WDM"] = Here_WDM
+
+    for idx, result in enumerate(mapping_result):
+        DLM_id = DLM.WDM[idx]
+        for idx in result:
+            if idx != -1:
+                np.append(Herestreet.WDM[idx], DLM_id)
+
+    print(Herestreet["WDM"])
+
+
+    #get wdm id -> DLM.WDM[0]
 
 if __name__ == '__main__':
     #load()
